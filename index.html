@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADDCA Basic 136 — Course Calendar</title>
+    <style>
+        /* CSS Variables for Module Colors */
+        :root {
+            --color-b1: #4a90d9; /* Blue */
+            --color-b2: #27ae60; /* Green */
+            --color-b3: #8e44ad; /* Purple */
+            --color-b4: #e67e22; /* Orange */
+            --color-csp: #e74c3c; /* Red for CSP deadlines */
+            --color-lp: #95a5a6; /* Gray for LP meetings */
+            --color-current: #fff8e1; /* Light yellow for today */
+            --color-current-dark: #fbc02d; /* Yellow border for today */
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --border-radius: 8px;
+        }
+
+        /* Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* CSS-only View Toggle */
+        #view-toggle {
+            display: none;
+        }
+
+        /* Default state: Timeline view visible, Calendar view hidden */
+        .timeline-view {
+            display: block;
+        }
+
+        .calendar-view {
+            display: none;
+        }
+
+        /* When checkbox is checked: hide timeline, show calendar */
+        body:has(#view-toggle:checked) .timeline-view {
+            display: none !important;
+        }
+
+        body:has(#view-toggle:checked) .calendar-view {
+            display: block !important;
+        }
+
+        /* Override: when an anchor is targeted, always show timeline */
+        body:has(#view-toggle:checked):has(:target) .timeline-view {
+            display: block !important;
+        }
+        body:has(#view-toggle:checked):has(:target) .calendar-view {
+            display: none !important;
+        }
+
+        .session-card:target {
+            outline: 3px solid #667eea;
+            outline-offset: 4px;
+            border-radius: 12px;
+            animation: pulse 1s ease-in-out;
+        }
+        @keyframes pulse {
+            0% { outline-color: transparent; }
+            50% { outline-color: #667eea; }
+            100% { outline-color: #667eea; }
+        }
+
+        /* Toggle Button Styles */
+        .toggle-container {
+            background: white;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+
+        .toggle-buttons {
+            display: inline-flex;
+            background: #f0f0f0;
+            border-radius: 30px;
+            padding: 5px;
+            gap: 0;
+        }
+
+        .toggle-label {
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            background: none;
+            user-select: none;
+        }
+
+        /* Default state: Timeline active, Calendar inactive */
+        .toggle-timeline {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.4) !important;
+        }
+
+        .toggle-calendar {
+            background: transparent !important;
+            color: #666 !important;
+        }
+
+        /* When checkbox is checked: Calendar active, Timeline inactive */
+        body:has(#view-toggle:checked) .toggle-timeline {
+            background: transparent !important;
+            color: #666 !important;
+            box-shadow: none !important;
+        }
+
+        body:has(#view-toggle:checked) .toggle-calendar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.4) !important;
+        }
+
+        .toggle-label:hover {
+            opacity: 0.9;
+        }
+
+        /* Body Styles */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #fafafa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.02em;
+        }
+
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .header .date-range {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .progress-container {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            padding: 4px;
+            margin-top: 20px;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .progress-bar {
+            background: rgba(255,255,255,0.9);
+            height: 8px;
+            border-radius: 6px;
+            width: 19.2%; /* 5/26 = 19.2% */
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        /* Content Styles */
+        .content {
+            padding: 30px;
+        }
+
+        .current-status {
+            background: var(--color-current);
+            border: 2px solid var(--color-current-dark);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .current-status h2 {
+            color: var(--color-current-dark);
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+        }
+
+        .current-status p {
+            font-size: 1.1rem;
+            color: #666;
+        }
+
+        /* Timeline View Styles */
+        .timeline {
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 30px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--color-b1), var(--color-b2), var(--color-b3), var(--color-b4));
+            border-radius: 2px;
+        }
+
+        .module-section {
+            margin-bottom: 40px;
+        }
+
+        .module-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-left: 70px;
+        }
+
+        .module-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            margin-right: 20px;
+            font-size: 1.1rem;
+        }
+
+        .module-b1 .module-icon { background: var(--color-b1); }
+        .module-b2 .module-icon { background: var(--color-b2); }
+        .module-b3 .module-icon { background: var(--color-b3); }
+        .module-b4 .module-icon { background: var(--color-b4); }
+
+        .module-info h3 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+        }
+
+        .module-info p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        /* Session Card Styles */
+        .session-card {
+            position: relative;
+            margin-left: 70px;
+            margin-bottom: 15px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            transition: all 0.2s ease;
+            border-left: 4px solid #ddd;
+            overflow: hidden;
+        }
+
+        .session-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .session-card.module-b1 { 
+            border-left-color: var(--color-b1); 
+            background: rgba(74, 144, 217, 0.05);
+        }
+        .session-card.module-b2 { 
+            border-left-color: var(--color-b2); 
+            background: rgba(39, 174, 96, 0.05);
+        }
+        .session-card.module-b3 { 
+            border-left-color: var(--color-b3); 
+            background: rgba(142, 68, 173, 0.05);
+        }
+        .session-card.module-b4 { 
+            border-left-color: var(--color-b4); 
+            background: rgba(230, 126, 34, 0.05);
+        }
+
+        .session-card.completed {
+            opacity: 0.7;
+            background: rgba(76, 175, 80, 0.08);
+            border-left-color: #4caf50;
+        }
+
+        .session-card.current {
+            background: var(--color-current);
+            border-left-color: var(--color-current-dark);
+            border-left-width: 6px;
+            transform: scale(1.02);
+        }
+
+        .session-card.csp-deadline {
+            background: rgba(231, 76, 60, 0.08);
+            border-left-color: var(--color-csp);
+        }
+
+        .session-content {
+            padding: 20px;
+        }
+
+        .session-date {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .session-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .session-topic {
+            font-size: 0.95rem;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .session-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge.csp {
+            background: var(--color-csp);
+            color: white;
+        }
+
+        .badge.current {
+            background: var(--color-current-dark);
+            color: white;
+        }
+
+        .badge.completed {
+            background: #4caf50;
+            color: white;
+        }
+
+        .badge.countdown {
+            background: #ff9800;
+            color: white;
+        }
+
+        /* Learning Partner Meeting Styles */
+        .learning-partner {
+            margin-left: 70px;
+            margin-bottom: 10px;
+            padding: 12px 20px;
+            background: rgba(149, 165, 166, 0.08);
+            border-radius: var(--border-radius);
+            border-left: 3px solid var(--color-lp);
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Week Marker */
+        .week-marker {
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 44px;
+            height: 44px;
+            background: white;
+            border: 3px solid #ddd;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #666;
+            z-index: 2;
+        }
+
+        /* Fieldwork Sections using <details> and <summary> */
+        .session-card details {
+            margin-top: 12px;
+        }
+
+        .session-card summary {
+            padding: 8px 12px;
+            border: 1px solid rgba(0,0,0,0.15);
+            background: rgba(255,255,255,0.7);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #555;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .session-card summary:hover {
+            background: rgba(255,255,255,0.9);
+            border-color: rgba(0,0,0,0.25);
+        }
+
+        /* Hide default triangle marker */
+        .session-card summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .session-card summary::marker {
+            display: none;
+        }
+
+        /* Add custom chevron */
+        .session-card summary::after {
+            content: "▾";
+            font-size: 0.8rem;
+            transition: transform 0.3s ease;
+            margin-left: auto;
+        }
+
+        .session-card details[open] summary::after {
+            transform: rotate(180deg);
+        }
+
+        .fieldwork-content {
+            background: rgba(255,255,255,0.5);
+            border-radius: 6px;
+            margin-top: 8px;
+            padding: 16px;
+        }
+
+        .fieldwork-section {
+            margin-bottom: 16px;
+        }
+
+        .fieldwork-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .fieldwork-section h4 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .fieldwork-section ul {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .fieldwork-section li {
+            padding-left: 16px;
+            margin-bottom: 6px;
+            position: relative;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: #555;
+        }
+
+        .fieldwork-section li::before {
+            content: "•";
+            position: absolute;
+            left: 4px;
+            color: #888;
+        }
+
+        .fieldwork-section a {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .fieldwork-section a:hover {
+            text-decoration: underline;
+        }
+
+        .fieldwork-placeholder {
+            text-align: center;
+            color: #888;
+            font-style: italic;
+            padding: 20px;
+            font-size: 0.9rem;
+        }
+
+        /* Calendar View Styles */
+        .calendar-months {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .calendar-month {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .calendar-month-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            width: 100%;
+        }
+
+        .calendar-day-header {
+            background: #f8f9fa;
+            padding: 8px 4px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .calendar-day {
+            min-height: 100px;
+            border-bottom: 1px solid #e9ecef;
+            border-right: 1px solid #e9ecef;
+            padding: 4px;
+            position: relative;
+            background: white;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .calendar-day:nth-child(7n) {
+            border-right: none;
+        }
+
+        .calendar-day.other-month {
+            background: #f8f9fa;
+            color: #ccc;
+        }
+
+        .calendar-day.today {
+            background: var(--color-current);
+            border: 2px solid var(--color-current-dark);
+        }
+
+        .calendar-day-number {
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .calendar-event {
+            font-size: 0.7rem;
+            padding: 3px 4px;
+            margin-bottom: 2px;
+            border-radius: 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.3;
+            min-width: 0;
+        }
+
+        .calendar-event.module-b1 { background: var(--color-b1); color: white; }
+        .calendar-event.module-b2 { background: var(--color-b2); color: white; }
+        .calendar-event.module-b3 { background: var(--color-b3); color: white; }
+        .calendar-event.module-b4 { background: var(--color-b4); color: white; }
+        .calendar-event.csp-deadline { background: var(--color-csp); color: white; }
+        .calendar-event.learning-partner { background: var(--color-lp); color: white; font-size: 0.7rem; padding: 3px 4px; white-space: normal; overflow: visible; text-overflow: clip; }
+        .calendar-event.completed { opacity: 0.7; }
+
+        /* Footer Styles */
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #666;
+        }
+
+        .footer p {
+            margin-bottom: 5px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .timeline::before {
+                left: 20px;
+            }
+
+            .module-header {
+                padding-left: 60px;
+            }
+
+            .session-card {
+                margin-left: 60px;
+            }
+
+            .learning-partner {
+                margin-left: 60px;
+            }
+
+            .week-marker {
+                left: -2px;
+                width: 40px;
+                height: 40px;
+            }
+
+            .calendar-day {
+                min-height: 65px;
+            }
+
+            .calendar-event {
+                font-size: 0.6rem;
+                padding: 1px 2px;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                font-size: 12pt;
+                line-height: 1.4;
+            }
+
+            .container {
+                box-shadow: none;
+                max-width: none;
+            }
+
+            .toggle-container {
+                display: none;
+            }
+
+            .session-card:hover {
+                transform: none;
+                box-shadow: var(--shadow);
+            }
+
+            .timeline::before,
+            .header,
+            .calendar-month-header,
+            .session-card.module-b1,
+            .session-card.module-b2,
+            .session-card.module-b3,
+            .session-card.module-b4,
+            .calendar-event {
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+        }
+    
+        .calendar-view a.calendar-event {
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        .calendar-view a.calendar-event:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        
+        /* When a session anchor is targeted, show timeline view regardless of toggle state */
+        body:has(.session-card:target) .timeline-view {
+            display: block !important;
+            /* Override the checked toggle */
+        }
+        body:has(.session-card:target) .calendar-view {
+            display: none !important;
+            /* Override the checked toggle */
+        }
+        /* Also override with higher specificity using :has + :checked combo */
+        body:has(#view-toggle:checked):has(.session-card:target) .timeline-view {
+            display: block !important;
+        }
+        body:has(#view-toggle:checked):has(.session-card:target) .calendar-view {
+            display: none !important;
+        }
+        /* Highlight the targeted session */
+        .session-card:target {
+            outline: 3px solid #667eea;
+            outline-offset: 4px;
+            border-radius: 12px;
+        }
+
+        
+        /* Calendar day needs relative positioning for popup */
+        .calendar-day {
+            position: relative;
+            overflow: visible !important;
+        }
+
+        /* Event popup (single at a time, fixed to viewport) */
+        .event-popup {
+            position: fixed;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 12px 16px;
+            min-width: 240px;
+            width: max-content;
+            max-width: 320px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+            z-index: 9999;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            text-align: left;
+            color: #333;
+            animation: popIn 0.15s ease-out;
+        }
+        @keyframes popIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+        .calendar-event.event-active {
+            outline: 2px solid #667eea;
+            outline-offset: 1px;
+        }
+
+        </style>
+</head>
+<body>
+    <!-- CSS-only View Toggle Checkbox -->
+    <input type="checkbox" id="view-toggle">
+
+    <div class="container">
+        <div class="header">
+            <h1>ADDCA Basic 136</h1>
+            <p class="subtitle">Course Calendar</p>
+            <p class="date-range">March 2, 2026 – June 1, 2026</p>
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+            <div class="progress-text">Progress: 5 of 26 sessions completed (19%)</div>
+        </div>
+
+        <div class="toggle-container">
+            <div class="toggle-buttons">
+                <label for="view-toggle" class="toggle-label toggle-timeline">📋 Timeline View</label>
+                <label for="view-toggle" class="toggle-label toggle-calendar">📅 Calendar View</label>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="current-status">
+                <h2>📍 You Are Here</h2>
+                <p><strong>Friday, March 6, 2026</strong> • Next session: Mon Mar 9 (B1.4)</p>
+            </div>
+
+            <!-- Timeline View -->
+            <div class="timeline-view">
+                <div style="text-align:center; margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:12px;">
+                    <strong>Quick Links:</strong>
+                    <a href="https://portal.addca.com/schedule" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">📅 ADDCA Portal</a> |
+                    <a href="https://portal.addca.com/library" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">📚 Library</a> |
+                    <a href="https://app.raenotes.com" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">🎧 RaeNotes</a> |
+                    <a href="https://coachingfederation.org" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">🏛️ ICF</a> |
+                    <a href="https://paaccoaches.org" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">🧠 PAAC</a>
+                </div>
+                <div class="timeline">
+                    <!-- Module B1: Introduction to ADHD Coaching -->
+                    <div class="module-section module-b1">
+                        <div class="module-header">
+                            <div class="module-icon">B1</div>
+                            <div class="module-info">
+                                <h3>Module B1: Introduction to ADHD Coaching</h3>
+                                <p>Foundation concepts and core competencies</p>
+                            </div>
+                        </div>
+
+                        <!-- B1.1 - Completed -->
+                        <div class="session-card module-b1 completed" id="b1-1">
+                            <div class="week-marker">W1</div>
+                            <div class="session-content">
+                                <div class="session-date">~Mon Feb 25</div>
+                                <div class="session-title">B1.1 What is Coaching?</div>
+                                <div class="session-topic">Introduction to coaching fundamentals</div>
+                                <div class="session-meta">
+                                    <span class="badge completed">Completed</span>
+                                </div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-section">
+                                            <h4>📖 Your Fieldwork</h4>
+                                            <ul>
+                                                <li>Review ICF core competencies, PAAC essentials, ethics docs</li>
+                                                <li>Check ICF (<a href="https://coachingfederation.org" target="_blank">coachingfederation.org</a>) and PAAC (<a href="https://paaccoaches.org" target="_blank">paaccoaches.org</a>)</li>
+                                                <li>Listen to Recording B1.2 — "A Good QuestVersation Session" by Erika Gillette (30 min) (<a href="https://app.raenotes.com" target="_blank">link</a>)</li>
+                                                <li>Practice describing coaching</li>
+                                                <li>Develop personal definition</li>
+                                                <li>Watch ADHD Lens Video — David & Barbara (35 min) (<a href="https://portal.addca.com/library" target="_blank">link</a>)</li>
+                                            </ul>
+                                        </div>
+                                        <div class="fieldwork-section">
+                                            <h4>👥 Learning Partners</h4>
+                                            <ul>
+                                                <li>Discuss Recording B1.2</li>
+                                                <li>Explore distinguishing coaching from other professions</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <!-- B1.2 - Completed -->
+                        <div class="session-card module-b1 completed" id="b1-2">
+                            <div class="session-content">
+                                <div class="session-date">Mon Mar 2</div>
+                                <div class="session-title">B1.2 ICF Core Competencies, PAAC Essentials, Ethics & Certification</div>
+                                <div class="session-topic">Professional standards and certification requirements</div>
+                                <div class="session-meta">
+                                    <span class="badge completed">Completed</span>
+                                </div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-section">
+                                            <h4>📖 Your Fieldwork</h4>
+                                            <ul>
+                                                <li>Practice explaining coaching</li>
+                                                <li>Review Recording B2.2 — coaching with leader's feedback (<a href="https://app.raenotes.com" target="_blank">link</a>)</li>
+                                                <li>Review Basic Project Instructions in portal (<a href="https://portal.addca.com/library" target="_blank">link</a>)</li>
+                                                <li>Review Welcome Packet Template in portal (<a href="https://portal.addca.com/library" target="_blank">link</a>)</li>
+                                            </ul>
+                                        </div>
+                                        <div class="fieldwork-section">
+                                            <h4>👥 Learning Partners</h4>
+                                            <ul>
+                                                <li>Discuss opportunities/challenges meeting prospective clients</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <!-- Learning Partner Meeting -->
+                        <div class="learning-partner">
+                            <strong>Tue Mar 3:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <!-- B1.3 - Completed -->
+                        <div class="session-card module-b1 completed" id="b1-3">
+                            <div class="week-marker">W2</div>
+                            <div class="session-content">
+                                <div class="session-date">Wed Mar 4</div>
+                                <div class="session-title">B1.3 Starting a Coaching Relationship — Welcome Packet & Agreement</div>
+                                <div class="session-topic">Client onboarding and initial setup</div>
+                                <div class="session-meta">
+                                    <span class="badge completed">Completed</span>
+                                </div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-section">
+                                            <h4>📖 Your Fieldwork</h4>
+                                            <ul>
+                                                <li>Listen to Recording B1.3</li>
+                                                <li>Listen to Recording B1.5</li>
+                                                <li>Consider completing coaching contract + welcome packet</li>
+                                                <li>Practice reviewing contract and getting first goals</li>
+                                            </ul>
+                                        </div>
+                                        <div class="fieldwork-section">
+                                            <h4>👥 Learning Partners</h4>
+                                            <ul>
+                                                <li>Support each other completing contracts/welcome packets</li>
+                                                <li>Practice reviewing contract with a new client</li>
+                                                <li>Discuss Recordings B1.3 and B1.5</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <!-- B1.4 - Next Session -->
+                        <div class="session-card module-b1 current" id="b1-4">
+                            <div class="session-content">
+                                <div class="session-date">Mon Mar 9</div>
+                                <div class="session-title">B1.4 Introducing the QuestVersation© & Being Model</div>
+                                <div class="session-topic">Core coaching methodology introduction</div>
+                                <div class="session-meta">
+                                    <span class="badge current">Next Session</span>
+                                </div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-section">
+                                            <h4>📖 Your Fieldwork</h4>
+                                            <ul>
+                                                <li>Practice explaining coaching to someone</li>
+                                                <li>Begin lining up first prospective clients</li>
+                                            </ul>
+                                        </div>
+                                        <div class="fieldwork-section">
+                                            <h4>👥 Learning Partners</h4>
+                                            <ul>
+                                                <li>Practice coaching one another</li>
+                                                <li>Discuss what you learned in Module 1</li>
+                                            </ul>
+                                        </div>
+                                        <div class="fieldwork-section">
+                                            <h4>📚 Module B2 Prework</h4>
+                                            <ul>
+                                                <li>Think about your own experience interviewing/starting with a coach</li>
+                                                <li>Consider how you'd like to do complimentary sessions</li>
+                                                <li>Think how to explain coaching to a prospect</li>
+                                                <li>Listen to <a href="https://app.raenotes.com" target="_blank">Recording B2.1A</a></li>
+                                                <li>Read <a href="https://portal.addca.com/library" target="_blank">B2.1 Client "Homework"</a></li>
+                                                <li>Listen to <a href="https://app.raenotes.com" target="_blank">Recording B2.1B</a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <!-- Learning Partner Meeting -->
+                        <div class="learning-partner">
+                            <strong>Tue Mar 10:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+                    </div>
+
+                    <!-- Module B2: Anatomy of a Coaching Practice -->
+                    <div class="module-section module-b2">
+                        <div class="module-header">
+                            <div class="module-icon">B2</div>
+                            <div class="module-info">
+                                <h3>Module B2: Anatomy of a Coaching Practice</h3>
+                                <p>Building client relationships and coaching processes</p>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b2" id="b2-1">
+                            <div class="week-marker">W3</div>
+                            <div class="session-content">
+                                <div class="session-date">Wed Mar 11</div>
+                                <div class="session-title">B2.1 From Prospect to Client</div>
+                                <div class="session-topic">Client acquisition process</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b2" id="b2-2">
+                            <div class="session-content">
+                                <div class="session-date">Mon Mar 16</div>
+                                <div class="session-title">B2.2 Starting a Coaching Relationship</div>
+                                <div class="session-topic">Building trust and rapport</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue Mar 17:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b2" id="b2-3">
+                            <div class="week-marker">W4</div>
+                            <div class="session-content">
+                                <div class="session-date">Wed Mar 18</div>
+                                <div class="session-title">B2.3 New Client Intake Process</div>
+                                <div class="session-topic">Systematic client onboarding</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b2" id="b2-4">
+                            <div class="session-content">
+                                <div class="session-date">Mon Mar 23</div>
+                                <div class="session-title">B2.4 Obtaining a Session Agreement</div>
+                                <div class="session-topic">Setting clear expectations</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue Mar 24:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b2" id="b2-5">
+                            <div class="week-marker">W5</div>
+                            <div class="session-content">
+                                <div class="session-date">Wed Mar 25</div>
+                                <div class="session-title">B2.5 Your First Coaching Session</div>
+                                <div class="session-topic">Conducting initial sessions</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b2 csp-deadline" id="b2-6">
+                            <div class="session-content">
+                                <div class="session-date">Mon Mar 30</div>
+                                <div class="session-title">B2.6 What a Practice Looks Like</div>
+                                <div class="session-topic">Practice structure and management</div>
+                                <div class="session-meta">
+                                    <span class="badge csp">⚠️ CSP 1 DUE</span>
+                                    <span class="badge countdown">25 days</span>
+                                </div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue Mar 31:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+                    </div>
+
+                    <!-- Module B3: The QuestVersation© Coaching Process -->
+                    <div class="module-section module-b3">
+                        <div class="module-header">
+                            <div class="module-icon">B3</div>
+                            <div class="module-info">
+                                <h3>Module B3: The QuestVersation© Coaching Process</h3>
+                                <p>Mastering the ADDCA coaching methodology</p>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-1">
+                            <div class="week-marker">W6</div>
+                            <div class="session-content">
+                                <div class="session-date">Mon Apr 6</div>
+                                <div class="session-title">B3.1 Stages of a Client: LEAP</div>
+                                <div class="session-topic">Client development phases</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue Apr 7:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-2">
+                            <div class="session-content">
+                                <div class="session-date">Wed Apr 8</div>
+                                <div class="session-title">B3.2 The Being Model</div>
+                                <div class="session-topic">Holistic client understanding</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-3">
+                            <div class="week-marker">W7</div>
+                            <div class="session-content">
+                                <div class="session-date">Mon Apr 13</div>
+                                <div class="session-title">B3.3 QuestVersation© Example Session</div>
+                                <div class="session-topic">Live coaching demonstration</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue Apr 14:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-4">
+                            <div class="session-content">
+                                <div class="session-date">Wed Apr 15</div>
+                                <div class="session-title">B3.4 Power of the Pause</div>
+                                <div class="session-topic">Using silence effectively</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b3 csp-deadline" id="b3-5">
+                            <div class="week-marker">W8</div>
+                            <div class="session-content">
+                                <div class="session-date">Mon Apr 20</div>
+                                <div class="session-title">B3.5 Witnessing & Questioning</div>
+                                <div class="session-topic">Advanced coaching skills</div>
+                                <div class="session-meta">
+                                    <span class="badge csp">⚠️ CSP 2 DUE</span>
+                                    <span class="badge countdown">46 days</span>
+                                </div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue Apr 21:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-6">
+                            <div class="session-content">
+                                <div class="session-date">Wed Apr 22</div>
+                                <div class="session-title">B3.6 Filtering Client Stories</div>
+                                <div class="session-topic">Identifying key themes</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-7">
+                            <div class="week-marker">W9</div>
+                            <div class="session-content">
+                                <div class="session-date">Mon Apr 27</div>
+                                <div class="session-title">B3.7 Activating for Momentum</div>
+                                <div class="session-topic">Supporting client action</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue Apr 28:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-8">
+                            <div class="session-content">
+                                <div class="session-date">Wed Apr 29</div>
+                                <div class="session-title">B3.8 Reinventing Client Stories</div>
+                                <div class="session-topic">Helping clients reframe narratives</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b3" id="b3-9">
+                            <div class="week-marker">W10</div>
+                            <div class="session-content">
+                                <div class="session-date">Mon May 4</div>
+                                <div class="session-title">B3.9 Integrating ADDCA Models</div>
+                                <div class="session-topic">Combining coaching frameworks</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue May 5:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b3 csp-deadline" id="b3-10">
+                            <div class="session-content">
+                                <div class="session-date">Wed May 6</div>
+                                <div class="session-title">B3.10 Certification</div>
+                                <div class="session-topic">Assessment and certification process</div>
+                                <div class="session-meta">
+                                    <span class="badge csp">⚠️ CSP 3 DUE</span>
+                                    <span class="badge countdown">62 days</span>
+                                </div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Module B4: Setting Up Your Coaching Business -->
+                    <div class="module-section module-b4">
+                        <div class="module-header">
+                            <div class="module-icon">B4</div>
+                            <div class="module-info">
+                                <h3>Module B4: Setting Up Your Coaching Business</h3>
+                                <p>Building a sustainable coaching practice</p>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b4" id="b4-1">
+                            <div class="week-marker">W11</div>
+                            <div class="session-content">
+                                <div class="session-date">Mon May 11</div>
+                                <div class="session-title">B4.1 Best Practices, Deliverables, Tools</div>
+                                <div class="session-topic">Essential practice resources</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue May 12:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b4" id="b4-2">
+                            <div class="session-content">
+                                <div class="session-date">Wed May 13</div>
+                                <div class="session-title">B4.2 Structuring Your Business</div>
+                                <div class="session-topic">Legal and operational setup</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b4" id="b4-3">
+                            <div class="week-marker">W12</div>
+                            <div class="session-content">
+                                <div class="session-date">Mon May 18</div>
+                                <div class="session-title">B4.3 Telling Your Story</div>
+                                <div class="session-topic">Personal branding and marketing</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue May 19:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b4" id="b4-4">
+                            <div class="session-content">
+                                <div class="session-date">Wed May 20</div>
+                                <div class="session-title">B4.4 Self-Care, Boundaries, Energy</div>
+                                <div class="session-topic">Maintaining well-being as a coach</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="learning-partner">
+                            <strong>Tue May 26:</strong> Learning Partner Meeting (7:00-8:30 PM)
+                        </div>
+
+                        <div class="session-card module-b4" id="b4-5">
+                            <div class="week-marker">W13</div>
+                            <div class="session-content">
+                                <div class="session-date">Wed May 27</div>
+                                <div class="session-title">B4.5 Ethics of ADHD Coaching</div>
+                                <div class="session-topic">Professional standards and ethics</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="session-card module-b4" id="b4-6">
+                            <div class="session-content">
+                                <div class="session-date">Mon Jun 1</div>
+                                <div class="session-title">B4.6 Q&A & Celebration 🎓</div>
+                                <div class="session-topic">Course completion and next steps</div>
+                                <details>
+                                    <summary>📝 Fieldwork</summary>
+                                    <div class="fieldwork-content">
+                                        <div class="fieldwork-placeholder">
+                                            📋 Fieldwork will be added when module slides are released
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div class="calendar-view">
+                <div style="text-align:center; margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:12px;">
+                    <strong>Quick Links:</strong>
+                    <a href="https://portal.addca.com/schedule" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">📅 ADDCA Portal</a> |
+                    <a href="https://portal.addca.com/library" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">📚 Library</a> |
+                    <a href="https://app.raenotes.com" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">🎧 RaeNotes</a> |
+                    <a href="https://coachingfederation.org" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">🏛️ ICF</a> |
+                    <a href="https://paaccoaches.org" style="margin:0 10px; color:#667eea; text-decoration:none; font-weight:600;">🧠 PAAC</a>
+                </div>
+                <div class="calendar-months">
+                    <!-- March 2026 -->
+                    <div class="calendar-month">
+                        <div class="calendar-month-header">March 2026</div>
+                        <div class="calendar-grid">
+                            <div class="calendar-day-header">Sun</div>
+                            <div class="calendar-day-header">Mon</div>
+                            <div class="calendar-day-header">Tue</div>
+                            <div class="calendar-day-header">Wed</div>
+                            <div class="calendar-day-header">Thu</div>
+                            <div class="calendar-day-header">Fri</div>
+                            <div class="calendar-day-header">Sat</div>
+                            <div class="calendar-day"><div class="calendar-day-number">1</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">2</div>
+                                <div class="calendar-event module-b1 completed" data-popup="%3Cstrong%3EB1.2%3C%2Fstrong%3E%20%E2%80%94%20ICF%20Core%20Competencies%2C%20PAAC%2C%20Ethics%3Cbr%3E%3Csmall%3EMon%20Mar%202%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E%3Cbr%3E%3Csmall%20style%3D%22color%3A%234caf50%3Bfont-weight%3Abold%22%3E%E2%9C%85%20Completed%3C%2Fsmall%3E">B1.2 ICF Core</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">3</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Mar%203%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">4</div>
+                                <div class="calendar-event module-b1 completed" data-popup="%3Cstrong%3EB1.3%3C%2Fstrong%3E%20%E2%80%94%20Starting%20a%20Coaching%20Relationship%20%E2%80%94%20Welcome%20Packet%3Cbr%3E%3Csmall%3EWed%20Mar%204%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E%3Cbr%3E%3Csmall%20style%3D%22color%3A%234caf50%3Bfont-weight%3Abold%22%3E%E2%9C%85%20Completed%3C%2Fsmall%3E">B1.3 Welcome</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">5</div></div>
+                            <div class="calendar-day today"><div class="calendar-day-number">6</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">7</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">8</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">9</div>
+                                <div class="calendar-event module-b1" data-popup="%3Cstrong%3EB1.4%3C%2Fstrong%3E%20%E2%80%94%20Introducing%20the%20QuestVersation%C2%A9%20%26%20Being%20Model%3Cbr%3E%3Csmall%3EMon%20Mar%209%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E%3Cbr%3E%3Csmall%20style%3D%22color%3A%23fbc02d%3Bfont-weight%3Abold%22%3E%E2%AD%90%20Next%20Session%3C%2Fsmall%3E">B1.4 QuestV©</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">10</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Mar%2010%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">11</div>
+                                <div class="calendar-event module-b2" data-popup="%3Cstrong%3EB2.1%3C%2Fstrong%3E%20%E2%80%94%20From%20Prospect%20to%20Client%3Cbr%3E%3Csmall%3EWed%20Mar%2011%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B2.1 Prospect</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">12</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">13</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">14</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">15</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">16</div>
+                                <div class="calendar-event module-b2" data-popup="%3Cstrong%3EB2.2%3C%2Fstrong%3E%20%E2%80%94%20Starting%20a%20Coaching%20Relationship%3Cbr%3E%3Csmall%3EMon%20Mar%2016%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B2.2 Starting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">17</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Mar%2017%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">18</div>
+                                <div class="calendar-event module-b2" data-popup="%3Cstrong%3EB2.3%3C%2Fstrong%3E%20%E2%80%94%20New%20Client%20Intake%20Process%3Cbr%3E%3Csmall%3EWed%20Mar%2018%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B2.3 Intake</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">19</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">20</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">21</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">22</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">23</div>
+                                <div class="calendar-event module-b2" data-popup="%3Cstrong%3EB2.4%3C%2Fstrong%3E%20%E2%80%94%20Obtaining%20a%20Session%20Agreement%3Cbr%3E%3Csmall%3EMon%20Mar%2023%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B2.4 Agreement</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">24</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Mar%2024%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">25</div>
+                                <div class="calendar-event module-b2" data-popup="%3Cstrong%3EB2.5%3C%2Fstrong%3E%20%E2%80%94%20Your%20First%20Coaching%20Session%3Cbr%3E%3Csmall%3EWed%20Mar%2025%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B2.5 First Sess</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">26</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">27</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">28</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">29</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">30</div>
+                                <div class="calendar-event module-b2" data-popup="%3Cstrong%3EB2.6%3C%2Fstrong%3E%20%E2%80%94%20What%20a%20Practice%20Looks%20Like%3Cbr%3E%3Csmall%3EMon%20Mar%2030%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E%3Cbr%3E%3Csmall%20style%3D%22color%3A%23e74c3c%3Bfont-weight%3Abold%22%3E%E2%9A%A0%EF%B8%8F%20CSP%201%20DUE%3C%2Fsmall%3E">B2.6 Practice</div>
+                                <div class="calendar-event csp-deadline">CSP 1 DUE</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">31</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Mar%2031%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">1</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">2</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">3</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">4</div></div>
+                        </div>
+                    </div>
+
+                    <!-- April 2026 -->
+                    <div class="calendar-month">
+                        <div class="calendar-month-header">April 2026</div>
+                        <div class="calendar-grid">
+                            <div class="calendar-day-header">Sun</div>
+                            <div class="calendar-day-header">Mon</div>
+                            <div class="calendar-day-header">Tue</div>
+                            <div class="calendar-day-header">Wed</div>
+                            <div class="calendar-day-header">Thu</div>
+                            <div class="calendar-day-header">Fri</div>
+                            <div class="calendar-day-header">Sat</div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">29</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">30</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">31</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">1</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">2</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">3</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">4</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">5</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">6</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.1%3C%2Fstrong%3E%20%E2%80%94%20Stages%20of%20a%20Client%3A%20LEAP%3Cbr%3E%3Csmall%3EMon%20Apr%206%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.1 LEAP</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">7</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Apr%207%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">8</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.2%3C%2Fstrong%3E%20%E2%80%94%20The%20Being%20Model%3Cbr%3E%3Csmall%3EWed%20Apr%208%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.2 Being</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">9</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">10</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">11</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">12</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">13</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.3%3C%2Fstrong%3E%20%E2%80%94%20QuestVersation%C2%A9%20Example%20Session%3Cbr%3E%3Csmall%3EMon%20Apr%2013%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.3 Example</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">14</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Apr%2014%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">15</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.4%3C%2Fstrong%3E%20%E2%80%94%20Power%20of%20the%20Pause%3Cbr%3E%3Csmall%3EWed%20Apr%2015%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.4 Pause</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">16</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">17</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">18</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">19</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">20</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.5%3C%2Fstrong%3E%20%E2%80%94%20Witnessing%20%26%20Questioning%3Cbr%3E%3Csmall%3EMon%20Apr%2020%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E%3Cbr%3E%3Csmall%20style%3D%22color%3A%23e74c3c%3Bfont-weight%3Abold%22%3E%E2%9A%A0%EF%B8%8F%20CSP%202%20DUE%3C%2Fsmall%3E">B3.5 Witness</div>
+                                <div class="calendar-event csp-deadline">CSP 2 DUE</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">21</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Apr%2021%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">22</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.6%3C%2Fstrong%3E%20%E2%80%94%20Filtering%20Client%20Stories%3Cbr%3E%3Csmall%3EWed%20Apr%2022%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.6 Filtering</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">23</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">24</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">25</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">26</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">27</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.7%3C%2Fstrong%3E%20%E2%80%94%20Activating%20for%20Momentum%3Cbr%3E%3Csmall%3EMon%20Apr%2027%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.7 Activate</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">28</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20Apr%2028%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">29</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.8%3C%2Fstrong%3E%20%E2%80%94%20Reinventing%20Client%20Stories%3Cbr%3E%3Csmall%3EWed%20Apr%2029%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.8 Reinvent</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">30</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">1</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">2</div></div>
+                        </div>
+                    </div>
+
+                    <!-- May 2026 -->
+                    <div class="calendar-month">
+                        <div class="calendar-month-header">May 2026</div>
+                        <div class="calendar-grid">
+                            <div class="calendar-day-header">Sun</div>
+                            <div class="calendar-day-header">Mon</div>
+                            <div class="calendar-day-header">Tue</div>
+                            <div class="calendar-day-header">Wed</div>
+                            <div class="calendar-day-header">Thu</div>
+                            <div class="calendar-day-header">Fri</div>
+                            <div class="calendar-day-header">Sat</div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">26</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">27</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">28</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">29</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">30</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">1</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">2</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">3</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">4</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.9%3C%2Fstrong%3E%20%E2%80%94%20Integrating%20ADDCA%20Models%3Cbr%3E%3Csmall%3EMon%20May%204%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B3.9 Integrate</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">5</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20May%205%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">6</div>
+                                <div class="calendar-event module-b3" data-popup="%3Cstrong%3EB3.10%3C%2Fstrong%3E%20%E2%80%94%20Certification%3Cbr%3E%3Csmall%3EWed%20May%206%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E%3Cbr%3E%3Csmall%20style%3D%22color%3A%23e74c3c%3Bfont-weight%3Abold%22%3E%E2%9A%A0%EF%B8%8F%20CSP%203%20DUE%3C%2Fsmall%3E">B3.10 Cert</div>
+                                <div class="calendar-event csp-deadline">CSP 3 DUE</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">7</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">8</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">9</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">10</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">11</div>
+                                <div class="calendar-event module-b4" data-popup="%3Cstrong%3EB4.1%3C%2Fstrong%3E%20%E2%80%94%20Best%20Practices%2C%20Deliverables%2C%20Tools%3Cbr%3E%3Csmall%3EMon%20May%2011%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B4.1 Practices</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">12</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20May%2012%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">13</div>
+                                <div class="calendar-event module-b4" data-popup="%3Cstrong%3EB4.2%3C%2Fstrong%3E%20%E2%80%94%20Structuring%20Your%20Business%3Cbr%3E%3Csmall%3EWed%20May%2013%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B4.2 Business</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">14</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">15</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">16</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">17</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">18</div>
+                                <div class="calendar-event module-b4" data-popup="%3Cstrong%3EB4.3%3C%2Fstrong%3E%20%E2%80%94%20Telling%20Your%20Story%3Cbr%3E%3Csmall%3EMon%20May%2018%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B4.3 Story</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">19</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20May%2019%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">20</div>
+                                <div class="calendar-event module-b4" data-popup="%3Cstrong%3EB4.4%3C%2Fstrong%3E%20%E2%80%94%20Self-Care%2C%20Boundaries%2C%20Energy%3Cbr%3E%3Csmall%3EWed%20May%2020%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B4.4 Self-Care</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">21</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">22</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">23</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">24</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">25</div></div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">26</div>
+                                <div class="calendar-event learning-partner" data-popup="%3Cstrong%3E%F0%9F%91%A5%20Learning%20Partner%20Meeting%3C%2Fstrong%3E%3Cbr%3E%3Csmall%3ETue%20May%2026%20%E2%80%A2%207%3A00%E2%80%938%3A30%20PM%3C%2Fsmall%3E">👥 LP Meeting</div>
+                            </div>
+                            <div class="calendar-day">
+                                <div class="calendar-day-number">27</div>
+                                <div class="calendar-event module-b4" data-popup="%3Cstrong%3EB4.5%3C%2Fstrong%3E%20%E2%80%94%20Ethics%20of%20ADHD%20Coaching%3Cbr%3E%3Csmall%3EWed%20May%2027%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E">B4.5 Ethics</div>
+                            </div>
+                            <div class="calendar-day"><div class="calendar-day-number">28</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">29</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">30</div></div>
+                            <div class="calendar-day"><div class="calendar-day-number">31</div></div>
+                            <div class="calendar-day other-month">
+                                <div class="calendar-day-number">1</div>
+                                <div class="calendar-event module-b4" data-popup="%3Cstrong%3EB4.6%3C%2Fstrong%3E%20%E2%80%94%20Q%26A%20%26%20Celebration%20%F0%9F%8E%93%3Cbr%3E%3Csmall%3EMon%20Jun%201%20%E2%80%A2%207-8%3A30%20PM%3C%2Fsmall%3E%3Cbr%3E%3Csmall%20style%3D%22color%3A%234caf50%3Bfont-weight%3Abold%22%3E%F0%9F%8E%93%20Graduation!%3C%2Fsmall%3E">B4.6 🎓</div>
+                            </div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">2</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">3</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">4</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">5</div></div>
+                            <div class="calendar-day other-month"><div class="calendar-day-number">6</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Created for Basic 136 Cohort</strong></p>
+            <p>Current as of March 6, 2026</p>
+            <p>26 sessions • 4 modules • 13 weeks</p>
+        </div>
+    </div>
+    <style>
+        /* Calendar event hover */
+        .calendar-event[data-popup] { cursor: pointer; transition: transform 0.1s ease; }
+        .calendar-event[data-popup]:hover { transform: scale(1.05); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    </style>
+    <script>
+        // === DYNAMIC DATE UPDATES ===
+        (function() {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const pad = n => String(n).padStart(2,'0');
+            const todayStr = today.getFullYear() + '-' + pad(today.getMonth()+1) + '-' + pad(today.getDate());
+            const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+            // Session dates (used for "You Are Here" + progress bar)
+            const sessions = [
+                {date:'2026-02-25',label:'~Mon Feb 25 (B1.1)'},
+                {date:'2026-03-02',label:'Mon Mar 2 (B1.2)'},
+                {date:'2026-03-04',label:'Wed Mar 4 (B1.3)'},
+                {date:'2026-03-09',label:'Mon Mar 9 (B1.4)'},
+                {date:'2026-03-11',label:'Wed Mar 11 (B2.1)'},
+                {date:'2026-03-16',label:'Mon Mar 16 (B2.2)'},
+                {date:'2026-03-18',label:'Wed Mar 18 (B2.3)'},
+                {date:'2026-03-23',label:'Mon Mar 23 (B2.4)'},
+                {date:'2026-03-25',label:'Wed Mar 25 (B2.5)'},
+                {date:'2026-03-30',label:'Mon Mar 30 (B2.6)'},
+                {date:'2026-04-06',label:'Mon Apr 6 (B3.1)'},
+                {date:'2026-04-08',label:'Wed Apr 8 (B3.2)'},
+                {date:'2026-04-13',label:'Mon Apr 13 (B3.3)'},
+                {date:'2026-04-15',label:'Wed Apr 15 (B3.4)'},
+                {date:'2026-04-20',label:'Mon Apr 20 (B3.5)'},
+                {date:'2026-04-22',label:'Wed Apr 22 (B3.6)'},
+                {date:'2026-04-27',label:'Mon Apr 27 (B3.7)'},
+                {date:'2026-04-29',label:'Wed Apr 29 (B3.8)'},
+                {date:'2026-05-04',label:'Mon May 4 (B3.9)'},
+                {date:'2026-05-06',label:'Wed May 6 (B3.10)'},
+                {date:'2026-05-11',label:'Mon May 11 (B4.1)'},
+                {date:'2026-05-13',label:'Wed May 13 (B4.2)'},
+                {date:'2026-05-18',label:'Mon May 18 (B4.3)'},
+                {date:'2026-05-20',label:'Wed May 20 (B4.4)'},
+                {date:'2026-05-27',label:'Wed May 27 (B4.5)'},
+                {date:'2026-06-01',label:'Mon Jun 1 (B4.6 🎓)'}
+            ];
+
+            // 1. Update "You Are Here" text
+            const statusP = document.querySelector('.current-status p');
+            if (statusP) {
+                const dayName = days[today.getDay()];
+                const monthName = months[today.getMonth()];
+                const dateStr = dayName + ', ' + monthName + ' ' + today.getDate() + ', ' + today.getFullYear();
+                const next = sessions.find(s => s.date >= todayStr);
+                const nextText = next ? ' • Next session: ' + next.label : ' • Course complete! 🎓';
+                statusP.innerHTML = '<strong>' + dateStr + '</strong>' + nextText;
+            }
+
+            // 2. Update "today" highlight on calendar grid
+            document.querySelectorAll('.calendar-day.today').forEach(el => el.classList.remove('today'));
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                const numEl = day.querySelector('.calendar-day-number');
+                if (!numEl) return;
+                const dayNum = parseInt(numEl.textContent);
+                const monthEl = day.closest('.calendar-month');
+                if (!monthEl) return;
+                const header = monthEl.querySelector('.calendar-month-header').textContent.trim();
+                const [mName, yr] = header.split(' ');
+                const mMap = {January:0,February:1,March:2,April:3,May:4,June:5,July:6,August:7,September:8,October:9,November:10,December:11};
+                const mIdx = mMap[mName];
+                if (mIdx === undefined) return;
+                const isOther = day.classList.contains('other-month');
+                if (isOther) return;
+                if (parseInt(yr) === today.getFullYear() && mIdx === today.getMonth() && dayNum === today.getDate()) {
+                    day.classList.add('today');
+                }
+            });
+
+            // 3. Update CSP countdown badges
+            const cspDates = {
+                'CSP 1': new Date('2026-03-30'),
+                'CSP 2': new Date('2026-04-20'),
+                'CSP 3': new Date('2026-05-06')
+            };
+            document.querySelectorAll('.badge.countdown').forEach(badge => {
+                const text = badge.textContent;
+                for (const [name, dueDate] of Object.entries(cspDates)) {
+                    if (text.includes('days')) {
+                        // Find which CSP this belongs to by checking sibling badges
+                        const parent = badge.parentElement;
+                        const cspBadge = parent.querySelector('.badge.csp');
+                        if (cspBadge) {
+                            for (const [cName, cDate] of Object.entries(cspDates)) {
+                                if (cspBadge.textContent.includes(cName.split(' ')[1])) {
+                                    const diff = Math.ceil((cDate - today) / (1000*60*60*24));
+                                    if (diff > 0) {
+                                        badge.textContent = diff + ' days';
+                                    } else if (diff === 0) {
+                                        badge.textContent = 'TODAY';
+                                        badge.style.background = '#e74c3c';
+                                    } else {
+                                        badge.textContent = Math.abs(diff) + ' days ago';
+                                        badge.style.background = '#999';
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            });
+
+            // 4. Update progress bar (count sessions before today)
+            const allSessionDates = sessions.map(s => s.date);
+            const completed = allSessionDates.filter(d => d < todayStr).length;
+            const total = 26;
+            const pct = Math.round((completed / total) * 100);
+            const bar = document.querySelector('.progress-bar');
+            if (bar) bar.style.width = pct + '%';
+            const progressText = document.querySelector('.progress-text');
+            if (progressText) progressText.textContent = 'Progress: ' + completed + ' of ' + total + ' sessions completed (' + pct + '%)';
+
+            // 5. Update footer date
+            const footer = document.querySelector('.footer');
+            if (footer) {
+                const ps = footer.querySelectorAll('p');
+                ps.forEach(p => {
+                    if (p.textContent.includes('Current as of')) {
+                        p.textContent = 'Current as of ' + months[today.getMonth()] + ' ' + today.getDate() + ', ' + today.getFullYear();
+                    }
+                });
+            }
+        })();
+
+        // Persistent view toggle using localStorage
+        const toggle = document.getElementById('view-toggle');
+        const saved = localStorage.getItem('addca-view-toggle');
+        if (saved === 'calendar') {
+            toggle.checked = true;
+        }
+        toggle.addEventListener('change', function() {
+            localStorage.setItem('addca-view-toggle', this.checked ? 'calendar' : 'timeline');
+        });
+
+        // Single-popup system for calendar events
+        let activePopup = null;
+        let activeEvent = null;
+
+        function closePopup() {
+            if (activePopup) {
+                activePopup.remove();
+                activePopup = null;
+            }
+            if (activeEvent) {
+                activeEvent.classList.remove('event-active');
+                activeEvent = null;
+            }
+        }
+
+        function showPopup(eventEl) {
+            const popupHtml = decodeURIComponent(eventEl.getAttribute('data-popup'));
+            if (!popupHtml) return;
+
+            // If clicking the same event, just close
+            if (activeEvent === eventEl) {
+                closePopup();
+                return;
+            }
+
+            // Close any existing popup first
+            closePopup();
+
+            // Create popup attached to body (avoids overflow clipping)
+            const popup = document.createElement('div');
+            popup.className = 'event-popup';
+            popup.innerHTML = popupHtml;
+            document.body.appendChild(popup);
+
+            // Position using fixed coords relative to the clicked element
+            const rect = eventEl.getBoundingClientRect();
+            const popupWidth = 280;
+            const popupHeight = popup.offsetHeight || 120;
+
+            // Default: below the event
+            let top = rect.bottom + 8;
+            let left = rect.left;
+
+            // If popup would go off bottom of viewport, show above
+            if (top + popupHeight > window.innerHeight - 20) {
+                top = rect.top - popupHeight - 8;
+            }
+
+            // If popup would go off right edge, shift left
+            if (left + popupWidth > window.innerWidth - 20) {
+                left = window.innerWidth - popupWidth - 20;
+            }
+
+            // If off left edge
+            if (left < 10) left = 10;
+
+            popup.style.top = top + 'px';
+            popup.style.left = left + 'px';
+
+            activePopup = popup;
+            activeEvent = eventEl;
+            eventEl.classList.add('event-active');
+        }
+
+        // Attach click handlers immediately (script is at end of body, DOM is ready)
+        document.querySelectorAll('.calendar-event[data-popup]').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+                e.stopPropagation();
+                showPopup(el);
+            });
+        });
+
+        // Close popup when clicking anywhere else
+        document.addEventListener('click', function(e) {
+            if (activePopup && !activePopup.contains(e.target) && !e.target.classList.contains('calendar-event')) {
+                closePopup();
+            }
+        });
+
+        // Close popup on scroll (fixed position would drift)
+        window.addEventListener('scroll', function() {
+            if (activePopup) closePopup();
+        }, { passive: true });
+    </script>
+</body>
+</html>
